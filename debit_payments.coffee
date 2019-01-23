@@ -100,7 +100,7 @@ create table acct_debit_payments_1 as
     case
       when amount is null then payment_amount
       when payment_amount <= amount then null
-      when payment_amount > amount then payment_amount - amount end as applied_to_debit
+      when payment_amount > amount then payment_amount - amount end as applied_to_credit
 from acct_debit_payments;
 
 drop table acct_debit_payments;

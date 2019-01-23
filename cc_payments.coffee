@@ -38,55 +38,80 @@ drop table acct_credit_payments;
 alter table acct_credit_payments_1 rename to acct_credit_payments;
 ---------------------------------------
 
--- Categorize Incoming Card Payments --
+-- Aggregate Same Day Payments to Account Level --
 
 create table acct_credit_payments_1 as
+  select
+    a.account_id,
+    cast(b.created as date) as created,
+    sum(b.amount) as amount
+from acct_credit_payments a
+left join payment b on a.borrower_id = b.borrower_id
+where cast(b.created as date) = a.src_dt
+group by
+    a.account_id,
+    cast(b.created as date);
+
+create table acct_credit_payments_2 as
   select
     a.account_id,
     a.borrower_id,
     a.user_id,
     a.payment_amount,
     a.src_dt,
-    cast(b.created as date) as created,
     sum(b.amount) as amount
 from acct_credit_payments a
-left join payment b on a.borrower_id = b.borrower_id
-where cast(b.created as date) >= a.src_dt
+left join acct_credit_payments_1 b on a.account_id = b.account_id
 group by
     a.account_id,
     a.borrower_id,
     a.user_id,
     a.payment_amount,
-    a.src_dt,
-    cast(b.created as date);
-
-create table acct_credit_payments_2 as
-  select
-    *
-  from (select *,
-rank() over (partition by borrower_id order by created) as record_rank
-from acct_credit_payments_1 order by borrower_id, created) as ranked
-where ranked.record_rank = 1;
-
-create table acct_credit_payments_3 as
-  select
-    *,
-    case when payment_amount <= amount then payment_amount
-    when payment_amount > amount then amount end as applied_to_loans,
-    case when payment_amount <= amount then null
-    when payment_amount > amount then payment_amount - amount end as applied_to_credit
-from acct_credit_payments_2;
+    a.src_dt;
 
 drop table acct_credit_payments;
 drop table acct_credit_payments_1;
-drop table acct_credit_payments_2;
-alter table acct_credit_payments_3 rename to acct_credit_payments;
+alter table acct_credit_payments_2 rename to acct_credit_payments;
+---------------------------------------
+
+-- Add Receivables Data to Help Tag Credit Card Transactions --
+
+create table acct_credit_payments_1 as
+  select
+    a.*,
+    b.prev_balance,
+    b.curr_balance
+from acct_credit_payments a
+left join acct_receivables_rollup b on a.account_id = b.account_id;
+
+drop table acct_credit_payments;
+alter table acct_credit_payments_1 rename to acct_credit_payments;
+---------------------------------------
+
+-- Categorize Incoming Credit Card Payments --
+
+create table acct_credit_payments_1 as
+  select
+    *,
+    case
+      when amount is null then null
+      when payment_amount <= amount then payment_amount
+      when payment_amount > amount then amount end as applied_to_loans,
+    case
+      when amount is null then payment_amount
+      when payment_amount <= amount then null
+      when payment_amount > amount then payment_amount - amount end as applied_to_credit
+from acct_credit_payments;
+
+drop table acct_credit_payments;
+alter table acct_credit_payments_1 rename to acct_credit_payments;
+---------------------------------------
 
 insert into perpay_accounting_datamart.acct_credit_payments
   select distinct
     account_id,
     src_dt,
-    payment_amount as ach_amount,
+    payment_amount as creditcard_amount,
     applied_to_loans,
     applied_to_credit
 from acct_credit_payments;

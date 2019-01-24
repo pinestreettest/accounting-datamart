@@ -94,13 +94,17 @@ create table acct_credit_payments_1 as
   select
     *,
     case
+      when (prev_balance is null and curr_balance is null) then null
       when amount is null then null
       when payment_amount <= amount then payment_amount
-      when payment_amount > amount then amount end as applied_to_loans,
+      when payment_amount > amount then amount
+      end as applied_to_loans,
     case
+      when (prev_balance is null and curr_balance is null) then payment_amount
       when amount is null then payment_amount
       when payment_amount <= amount then null
-      when payment_amount > amount then payment_amount - amount end as applied_to_credit
+      when payment_amount > amount then payment_amount - amount
+      end as applied_to_credit
 from acct_credit_payments;
 
 drop table acct_credit_payments;

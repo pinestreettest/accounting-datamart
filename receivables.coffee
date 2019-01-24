@@ -158,10 +158,15 @@ where ranked.record_rank = 1;
 create table acct_receivables_5 as
   select
     a.*,
-    case when a.prev_status in ('charged_off') and b.ending_balance is null then a.principal_balance
-    else b.ending_balance end as prev_balance,
-    case when a.curr_status in ('charged_off') and c.ending_balance is null then a.principal_balance
-    else c.ending_balance end as curr_balance
+    case
+      when a.prev_status in ('charged_off') and b.ending_balance is null then a.principal_balance
+      when a.prev_status in ('application_started') then null
+      else b.ending_balance
+      end as prev_balance,
+    case
+      when a.curr_status in ('charged_off') and c.ending_balance is null then a.principal_balance
+      else c.ending_balance
+      end as curr_balance
 from acct_receivables a
 left join acct_receivables_4 b on a.loan_id = b.loan_id
 left join acct_receivables_2 c on a.loan_id = c.loan_id;

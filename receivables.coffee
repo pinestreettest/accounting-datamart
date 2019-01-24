@@ -7,7 +7,8 @@
 -- Pull approved loans --
 
 create table acct_receivables as
-select  borrower.id as borrower_id,
+select distinct
+        borrower.id as borrower_id,
         borrower.account_id,
         loanstatus.loan_id as loan_id,
         loan.amount,
@@ -160,7 +161,7 @@ create table acct_receivables_5 as
     a.*,
     case
       when a.prev_status in ('charged_off') and b.ending_balance is null then a.principal_balance
-      when a.prev_status in ('application_started') then null
+      when a.prev_status not in ('approved','repayment','late','default','charged_off') then null
       else b.ending_balance
       end as prev_balance,
     case
@@ -187,6 +188,7 @@ create table acct_receivables_1 as
     case when principal_balance = 0 and prev_balance = 0 and curr_balance = 0 then 1
     when principal_balance = 0 and prev_balance is null and curr_balance is null then 1
     when prev_status in ('canceled') and curr_status in ('canceled') then 1
+    when prev_status in ('complete') and curr_status in ('complete') then 1
     else 0 end as remove
 from acct_receivables a;
 
@@ -235,8 +237,6 @@ create table acct_receivables_rollup as
 from acct_receivables_1;
 
 drop table acct_receivables_1;
-
-insert into perpay_accounting_datamart.acct_receivables select distinct * from acct_receivables_rollup;
 
 ---------------------------------------
 ---------------------------------------
